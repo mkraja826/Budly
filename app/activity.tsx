@@ -1,9 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { buildCountingEvidence, createLearningEventId } from '../src/domain/learning/events';
 import { DefaultChildCharacter } from '../src/features/character/DefaultChildCharacter';
 import { childSelectionFeedback, childSuccessFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
+import { appendLearningEvent } from '../src/features/learningEvidence/localEvidenceStore';
 import { getCountingActivity } from '../src/features/learningTree/countingActivities';
+
+const LOCAL_CHILD_ID = 'local-child-v1';
 
 export default function ActivityScreen() {
   const params = useLocalSearchParams<{ activity?: string }>();
@@ -11,7 +15,10 @@ export default function ActivityScreen() {
   const activity = getCountingActivity(activityIndex);
   const objects = useMemo(() => Array.from({ length: activity.targetCount }, (_, index) => `${activity.id}-${index + 1}`), [activity]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [attempts, setAttempts] = useState(0);
   const celebrated = useRef(false);
+  const evidenceRecorded = useRef(false);
+  const startedAtMs = useRef(Date.now());
   const complete = selected.length === objects.length;
 
   const prompt = useMemo(() => {
@@ -22,7 +29,22 @@ export default function ActivityScreen() {
 
   useEffect(() => {
     setSelected([]);
+    setAttempts(0);
     celebrated.current = false;
+    evidenceRecorded.current = false;
+    startedAtMs.current = Date.now();
+
+    void appendLearningEvent({
+      eventId: createLearningEventId('activity_started'),
+      eventType: 'ACTIVITY_STARTED',
+      occurredAt: new Date().toISOString(),
+      childId: LOCAL_CHILD_ID,
+      activityId: activity.id,
+      activityVersion: 1,
+      skillIds: [activity.skillId],
+      payload: { targetCount: activity.targetCount, objectType: activity.objectNamePlural },
+    });
+
     void speakChildPrompt(activity.intro);
     return () => {
       void stopChildSpeech();
@@ -36,9 +58,64 @@ export default function ActivityScreen() {
     void speakChildPrompt(activity.success);
   }, [activity.success, complete]);
 
+  useEffect(() => {
+    if (!complete || evidenceRecorded.current) return;
+    evidenceRecorded.current = true;
+
+    const responseTimeMs = Date.now() - startedAtMs.current;
+    const evidence = buildCountingEvidence({
+      targetCount: activity.targetCount,
+      selectedObjectIds: selected,
+      attempts,
+      hintsUsed: 0,
+      responseTimeMs,
+    });
+    const completedAt = new Date().toISOString();
+
+    void appendLearningEvent({
+      eventId: createLearningEventId('activity_completed'),
+      eventType: 'ACTIVITY_COMPLETED',
+      occurredAt: completedAt,
+      childId: LOCAL_CHILD_ID,
+      activityId: activity.id,
+      activityVersion: 1,
+      skillIds: [activity.skillId],
+      payload: {
+        targetCount: evidence.targetCount,
+        attempts: evidence.attempts,
+        responseTimeMs: evidence.responseTimeMs,
+        completedIndependently: evidence.completedIndependently,
+      },
+    });
+
+    void appendLearningEvent({
+      eventId: createLearningEventId('skill_evidence'),
+      eventType: 'SKILL_EVIDENCE_RECORDED',
+      occurredAt: completedAt,
+      childId: LOCAL_CHILD_ID,
+      activityId: activity.id,
+      activityVersion: 1,
+      skillIds: [activity.skillId],
+      payload: { ...evidence },
+    });
+  }, [activity, attempts, complete, selected]);
+
   const toggleObject = async (id: string) => {
     if (complete) return;
+    setAttempts((current) => current + 1);
     await childSelectionFeedback();
+
+    void appendLearningEvent({
+      eventId: createLearningEventId('object_selected'),
+      eventType: 'OBJECT_SELECTED',
+      occurredAt: new Date().toISOString(),
+      childId: LOCAL_CHILD_ID,
+      activityId: activity.id,
+      activityVersion: 1,
+      skillIds: [activity.skillId],
+      payload: { objectId: id, alreadySelected: selected.includes(id) },
+    });
+
     setSelected((current) => {
       if (current.includes(id)) return current;
       const next = [...current, id];
