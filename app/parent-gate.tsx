@@ -1,7 +1,22 @@
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { supabase } from '../src/infrastructure/supabase/client';
 
 export default function ParentGateScreen() {
+  const [signedIn, setSignedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSignedIn(Boolean(data.session));
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
   return (
     <SafeAreaView style={styles.screen}>
       <Pressable accessibilityRole="button" accessibilityLabel="Close parent space" onPress={() => router.back()} style={styles.close}>
@@ -10,9 +25,15 @@ export default function ParentGateScreen() {
       <View style={styles.card}>
         <Text style={styles.lock}>🔒</Text>
         <Text style={styles.title}>Parents only</Text>
-        <Text style={styles.copy}>Production authentication will protect this space. For the current development build, continue to view the real local learning progress.</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open learning progress" onPress={() => router.push('/parent-progress')} style={styles.button}>
-          <Text style={styles.buttonText}>View learning progress</Text>
+        <Text style={styles.copy}>{signedIn ? 'You are signed in. Continue to the protected parent progress area.' : 'Sign in or create a parent account to manage child profiles and learning progress.'}</Text>
+        <Pressable
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={signedIn ? 'Open learning progress' : 'Open parent sign in'}
+          onPress={() => router.push(signedIn ? '/parent-progress' : '/parent-auth')}
+          style={styles.button}
+        >
+          <Text style={styles.buttonText}>{loading ? 'Checking…' : signedIn ? 'View learning progress' : 'Parent sign in'}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Back to Budly" onPress={() => router.back()} style={styles.secondaryButton}>
           <Text style={styles.secondaryText}>Back to Budly</Text>
