@@ -1,21 +1,63 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { recommendCountingPractice } from '../src/domain/learning/recommendation';
+import type { ChildSkillState, SkillId } from '../src/domain/learning/mastery';
 import { DefaultChildCharacter } from '../src/features/character/DefaultChildCharacter';
 import { childSelectionFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
+import { getChildSkillState } from '../src/features/learningEvidence/childSkillStateStore';
+
+const LOCAL_CHILD_ID = 'local-child-v1';
+const COUNTING_SKILL_ID = 'MATH.NUMBERS.COUNTING.01' as SkillId;
+
+const FALLBACK_STATE: ChildSkillState = {
+  skillId: COUNTING_SKILL_ID,
+  mastery: 'NOT_INTRODUCED',
+  confidence: 0,
+  evidenceCount: 0,
+  engineVersion: 'mastery-v1',
+};
 
 export default function LearningTreeScreen() {
+  const [skillState, setSkillState] = useState<ChildSkillState>(FALLBACK_STATE);
+
   useEffect(() => {
-    void speakChildPrompt('Welcome to the Learning Tree. Let’s count apples together!');
+    let active = true;
+    void getChildSkillState(LOCAL_CHILD_ID, COUNTING_SKILL_ID).then((state) => {
+      if (active) setSkillState(state);
+    });
+
     return () => {
-      void stopChildSpeech();
+      active = false;
     };
   }, []);
 
+  const recommendation = useMemo(() => recommendCountingPractice(skillState), [skillState]);
+
+  const guideCopy = useMemo(() => {
+    switch (recommendation.kind) {
+      case 'EASIER_PRACTICE':
+        return 'Let’s start with a little counting adventure!';
+      case 'STRETCH_PRACTICE':
+        return 'You’re ready for a bigger counting adventure!';
+      case 'REVIEW':
+        return 'Let’s see what you remember!';
+      default:
+        return 'Let’s count together!';
+    }
+  }, [recommendation.kind]);
+
+  useEffect(() => {
+    void speakChildPrompt(`Welcome to the Learning Tree. ${guideCopy}`);
+    return () => {
+      void stopChildSpeech();
+    };
+  }, [guideCopy]);
+
   const startCounting = async () => {
     await childSelectionFeedback();
-    await speakChildPrompt('Can you find three apples?');
-    router.push('/activity');
+    await speakChildPrompt(guideCopy);
+    router.push(`/activity?activity=${recommendation.startActivityIndex}`);
   };
 
   return (
@@ -41,13 +83,13 @@ export default function LearningTreeScreen() {
         <Pressable
           accessibilityLabel="Hear Learning Tree introduction again"
           accessibilityRole="button"
-          onPress={() => speakChildPrompt('Welcome to the Learning Tree. Let’s count apples together!')}
+          onPress={() => speakChildPrompt(`Welcome to the Learning Tree. ${guideCopy}`)}
           style={styles.speech}
         >
-          <Text style={styles.speechText}>🔊 Let’s count apples together!</Text>
+          <Text style={styles.speechText}>🔊 {guideCopy}</Text>
         </Pressable>
 
-        <Pressable accessibilityLabel="Start counting apples" accessibilityRole="button" onPress={startCounting} style={({ pressed }) => [styles.start, pressed && styles.startPressed]}>
+        <Pressable accessibilityLabel="Start adaptive counting adventure" accessibilityRole="button" onPress={startCounting} style={({ pressed }) => [styles.start, pressed && styles.startPressed]}>
           <Text style={styles.startIcon}>🍎</Text>
           <Text style={styles.startText}>Let’s Count!</Text>
         </Pressable>
