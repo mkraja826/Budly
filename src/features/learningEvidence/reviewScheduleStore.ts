@@ -81,3 +81,16 @@ export async function getDueReviews(childId: string, nowIso = new Date().toISOSt
     nowIso,
   );
 }
+
+export async function markReviewCompleted(childId: string, skillId: SkillId): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE review_schedule
+     SET completed_reviews = completed_reviews + 1,
+         updated_at = ?
+     WHERE child_id = ? AND skill_id = ?`,
+    new Date().toISOString(),
+    childId,
+    skillId,
+  );
+}
