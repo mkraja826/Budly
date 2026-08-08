@@ -77,6 +77,40 @@ export async function upsertReviewPlan(childId: string, skillId: SkillId, plan: 
   );
 }
 
+export async function upsertReviewSnapshot(childId: string, skillId: SkillId, input: {
+  dueAt: string;
+  intervalDays: number;
+  reason: ReviewPlan['reason'];
+  schedulerVersion: string;
+  completedReviews: number;
+}): Promise<void> {
+  const db = await getDb();
+  const current = await getReviewPlan(childId, skillId);
+  if ((current?.completed_reviews ?? 0) > input.completedReviews) return;
+
+  await db.runAsync(
+    `INSERT INTO review_schedule (
+      child_id, skill_id, due_at, interval_days, reason,
+      scheduler_version, completed_reviews, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(child_id, skill_id) DO UPDATE SET
+      due_at = excluded.due_at,
+      interval_days = excluded.interval_days,
+      reason = excluded.reason,
+      scheduler_version = excluded.scheduler_version,
+      completed_reviews = excluded.completed_reviews,
+      updated_at = excluded.updated_at`,
+    childId,
+    skillId,
+    input.dueAt,
+    input.intervalDays,
+    input.reason,
+    input.schedulerVersion,
+    Math.max(0, input.completedReviews),
+    new Date().toISOString(),
+  );
+}
+
 export async function getDueReviews(childId: string, nowIso = new Date().toISOString()) {
   const db = await getDb();
   return db.getAllAsync<{
