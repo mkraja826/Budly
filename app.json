@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Budly",
+    "slug": "budly",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "budly",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router"],
+    "android": {"package": "com.micirql.budly"},
+    "ios": {"bundleIdentifier": "com.micirql.budly"},
+    "experiments": {"typedRoutes": true}
+  }
+}
