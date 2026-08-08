@@ -5,9 +5,9 @@ import { DefaultChildCharacter } from '../src/features/character/DefaultChildCha
 import { childSelectionFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
 
 const zones = [
-  { title: 'Learning Tree', icon: '🌳', route: '/activity' as const, voice: 'Let’s count together!', style: 'tree' as const },
-  { title: 'Adventure Path', icon: '🐾', route: '/activity' as const, voice: 'Adventure time!', style: 'path' as const },
-  { title: 'Music Garden', icon: '🎵', route: '/activity' as const, voice: 'Let’s make some music!', style: 'music' as const },
+  { title: 'Learning Tree', icon: '🌳', route: '/learning-tree' as const, voice: 'Let’s visit the Learning Tree!', style: 'tree' as const },
+  { title: 'Adventure Path', icon: '🐾', route: null, voice: 'Adventure Path is coming soon!', style: 'path' as const },
+  { title: 'Music Garden', icon: '🎵', route: null, voice: 'Music Garden is coming soon!', style: 'music' as const },
 ];
 
 export default function SeedHomeScreen() {
@@ -18,10 +18,10 @@ export default function SeedHomeScreen() {
     };
   }, []);
 
-  const openZone = async (route: '/activity', voice: string) => {
+  const openZone = async (route: '/learning-tree' | null, voice: string) => {
     await childSelectionFeedback();
     await speakChildPrompt(voice);
-    router.push(route);
+    if (route) router.push(route);
   };
 
   return (
@@ -46,12 +46,7 @@ export default function SeedHomeScreen() {
           <View style={styles.hillsFront} />
           <View style={styles.ground} />
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Hear Budly greeting again"
-            onPress={() => speakChildPrompt('Hi! Ready for an adventure?')}
-            style={styles.speech}
-          >
+          <Pressable accessibilityRole="button" accessibilityLabel="Hear Budly greeting again" onPress={() => speakChildPrompt('Hi! Ready for an adventure?')} style={styles.speech}>
             <Text style={styles.speechText}>🔊 Hi! Ready for an adventure?</Text>
           </Pressable>
 
@@ -63,16 +58,11 @@ export default function SeedHomeScreen() {
             const zoneStyle = zone.style === 'tree' ? styles.treeZone : zone.style === 'path' ? styles.pathZone : styles.musicZone;
             const badgeStyle = zone.style === 'tree' ? styles.treeBadge : zone.style === 'path' ? styles.pathBadge : styles.musicBadge;
             return (
-              <Pressable
-                key={zone.title}
-                onPress={() => openZone(zone.route, zone.voice)}
-                style={({ pressed }) => [styles.worldZone, zoneStyle, pressed && styles.zonePressed]}
-                accessibilityRole="button"
-                accessibilityLabel={zone.title}
-              >
+              <Pressable key={zone.title} onPress={() => openZone(zone.route, zone.voice)} style={({ pressed }) => [styles.worldZone, zoneStyle, pressed && styles.zonePressed]} accessibilityRole="button" accessibilityLabel={zone.title}>
                 <Text style={styles.zoneIcon}>{zone.icon}</Text>
                 <View style={[styles.zoneBadge, badgeStyle]}>
                   <Text style={styles.zoneTitle}>{zone.title}</Text>
+                  {!zone.route ? <Text style={styles.soon}>Soon</Text> : null}
                 </View>
               </Pressable>
             );
@@ -86,7 +76,7 @@ export default function SeedHomeScreen() {
 
           <View style={styles.todayBubble}>
             <Text style={styles.todayLabel}>Today</Text>
-            <Text style={styles.todayValue}>⭐ 3 adventures</Text>
+            <Text style={styles.todayValue}>⭐ 1 adventure ready</Text>
           </View>
         </View>
       </View>
@@ -120,11 +110,12 @@ const styles = StyleSheet.create({
   musicZone: { left: 32, bottom: 54 },
   zonePressed: { transform: [{ scale: 0.95 }], opacity: 0.92 },
   zoneIcon: { fontSize: 84 },
-  zoneBadge: { marginTop: -4, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 3, borderColor: '#FFF' },
+  zoneBadge: { marginTop: -4, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 3, borderColor: '#FFF', alignItems: 'center' },
   treeBadge: { backgroundColor: '#F5E49B' },
   pathBadge: { backgroundColor: '#F2D9C6' },
   musicBadge: { backgroundColor: '#DCCDF7' },
   zoneTitle: { fontSize: 15, fontWeight: '900', color: '#38503C', textAlign: 'center' },
+  soon: { marginTop: 2, fontSize: 11, fontWeight: '800', color: '#7A6E69' },
   gardenPatch: { position: 'absolute', right: 20, bottom: 36, width: 150, minHeight: 106, borderRadius: 30, backgroundColor: '#DDF4CD', borderWidth: 4, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center', padding: 10 },
   gardenEmoji: { fontSize: 28 },
   gardenTitle: { fontSize: 16, fontWeight: '900', color: '#3A703A', marginTop: 4 },
