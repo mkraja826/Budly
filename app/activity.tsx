@@ -7,14 +7,17 @@ import { DefaultChildCharacter } from '../src/features/character/DefaultChildCha
 import { childSelectionFeedback, childSuccessFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
 import { applySkillEvidence } from '../src/features/learningEvidence/childSkillStateStore';
 import { appendLearningEvent } from '../src/features/learningEvidence/localEvidenceStore';
+import { markReviewCompleted } from '../src/features/learningEvidence/reviewScheduleStore';
 import { getCountingActivity } from '../src/features/learningTree/countingActivities';
 
 const LOCAL_CHILD_ID = 'local-child-v1';
 
 export default function ActivityScreen() {
-  const params = useLocalSearchParams<{ activity?: string }>();
+  const params = useLocalSearchParams<{ activity?: string; review?: string }>();
   const activityIndex = Number.parseInt(params.activity ?? '0', 10) || 0;
+  const isReview = params.review === '1';
   const activity = getCountingActivity(activityIndex);
+  const skillId = activity.skillId as SkillId;
   const objects = useMemo(() => Array.from({ length: activity.targetCount }, (_, index) => `${activity.id}-${index + 1}`), [activity]);
   const [selected, setSelected] = useState<string[]>([]);
   const [attempts, setAttempts] = useState(0);
@@ -44,76 +47,96 @@ export default function ActivityScreen() {
       activityId: activity.id,
       activityVersion: 1,
       skillIds: [activity.skillId],
-      payload: { targetCount: activity.targetCount, objectType: activity.objectNamePlural },
+      payload: { targetCount: activity.targetCount, objectType: activity.objectNamePlural, sessionKind: isReview ? 'REVIEW' : 'PRACTICE' },
     });
 
-    void speakChildPrompt(activity.intro);
+    void speakChildPrompt(isReview ? `Let’s see what you remember. ${activity.intro}` : activity.intro);
     return () => {
       void stopChildSpeech();
     };
-  }, [activity.id]);
+  }, [activity.id, isReview]);
 
   useEffect(() => {
     if (!complete || celebrated.current) return;
     celebrated.current = true;
     void childSuccessFeedback();
-    void speakChildPrompt(activity.success);
-  }, [activity.success, complete]);
+    void speakChildPrompt(isReview ? `You remembered it! ${activity.success}` : activity.success);
+  }, [activity.success, complete, isReview]);
 
   useEffect(() => {
     if (!complete || evidenceRecorded.current) return;
     evidenceRecorded.current = true;
 
-    const responseTimeMs = Date.now() - startedAtMs.current;
-    const evidence = buildCountingEvidence({
-      targetCount: activity.targetCount,
-      selectedObjectIds: selected,
-      attempts,
-      hintsUsed: 0,
-      responseTimeMs,
-    });
-    const completedAt = new Date().toISOString();
+    const recordEvidence = async () => {
+      const responseTimeMs = Date.now() - startedAtMs.current;
+      const evidence = buildCountingEvidence({
+        targetCount: activity.targetCount,
+        selectedObjectIds: selected,
+        attempts,
+        hintsUsed: 0,
+        responseTimeMs,
+      });
+      const completedAt = new Date().toISOString();
 
-    void appendLearningEvent({
-      eventId: createLearningEventId('activity_completed'),
-      eventType: 'ACTIVITY_COMPLETED',
-      occurredAt: completedAt,
-      childId: LOCAL_CHILD_ID,
-      activityId: activity.id,
-      activityVersion: 1,
-      skillIds: [activity.skillId],
-      payload: {
-        targetCount: evidence.targetCount,
-        attempts: evidence.attempts,
+      await appendLearningEvent({
+        eventId: createLearningEventId('activity_completed'),
+        eventType: 'ACTIVITY_COMPLETED',
+        occurredAt: completedAt,
+        childId: LOCAL_CHILD_ID,
+        activityId: activity.id,
+        activityVersion: 1,
+        skillIds: [activity.skillId],
+        payload: {
+          targetCount: evidence.targetCount,
+          attempts: evidence.attempts,
+          responseTimeMs: evidence.responseTimeMs,
+          completedIndependently: evidence.completedIndependently,
+          sessionKind: isReview ? 'REVIEW' : 'PRACTICE',
+        },
+      });
+
+      await appendLearningEvent({
+        eventId: createLearningEventId('skill_evidence'),
+        eventType: 'SKILL_EVIDENCE_RECORDED',
+        occurredAt: completedAt,
+        childId: LOCAL_CHILD_ID,
+        activityId: activity.id,
+        activityVersion: 1,
+        skillIds: [activity.skillId],
+        payload: { ...evidence, sessionKind: isReview ? 'REVIEW' : 'PRACTICE' },
+      });
+
+      if (isReview) {
+        await markReviewCompleted(LOCAL_CHILD_ID, skillId);
+        await appendLearningEvent({
+          eventId: createLearningEventId('review_completed'),
+          eventType: 'REVIEW_COMPLETED',
+          occurredAt: completedAt,
+          childId: LOCAL_CHILD_ID,
+          activityId: activity.id,
+          activityVersion: 1,
+          skillIds: [activity.skillId],
+          payload: {
+            completedIndependently: evidence.completedIndependently,
+            responseTimeMs: evidence.responseTimeMs,
+          },
+        });
+      }
+
+      const update = await applySkillEvidence(LOCAL_CHILD_ID, {
+        skillId,
+        correct: evidence.distinctSelections === evidence.targetCount,
+        attempts: Math.max(1, evidence.attempts),
+        hintsUsed: evidence.hintsUsed,
         responseTimeMs: evidence.responseTimeMs,
-        completedIndependently: evidence.completedIndependently,
-      },
-    });
+        difficulty: Math.min(1, activity.targetCount / 5),
+        independentCompletion: evidence.completedIndependently,
+        transferActivity: isReview || activityIndex > 0,
+        occurredAt: completedAt,
+      });
 
-    void appendLearningEvent({
-      eventId: createLearningEventId('skill_evidence'),
-      eventType: 'SKILL_EVIDENCE_RECORDED',
-      occurredAt: completedAt,
-      childId: LOCAL_CHILD_ID,
-      activityId: activity.id,
-      activityVersion: 1,
-      skillIds: [activity.skillId],
-      payload: { ...evidence },
-    });
-
-    void applySkillEvidence(LOCAL_CHILD_ID, {
-      skillId: activity.skillId as SkillId,
-      correct: evidence.distinctSelections === evidence.targetCount,
-      attempts: Math.max(1, evidence.attempts),
-      hintsUsed: evidence.hintsUsed,
-      responseTimeMs: evidence.responseTimeMs,
-      difficulty: Math.min(1, activity.targetCount / 5),
-      independentCompletion: evidence.completedIndependently,
-      transferActivity: activityIndex > 0,
-      occurredAt: completedAt,
-    }).then((update) => {
       if (update.next.mastery !== update.previous.mastery) {
-        void appendLearningEvent({
+        await appendLearningEvent({
           eventId: createLearningEventId('mastery_changed'),
           eventType: 'SKILL_EVIDENCE_RECORDED',
           occurredAt: completedAt,
@@ -132,8 +155,10 @@ export default function ActivityScreen() {
           },
         });
       }
-    });
-  }, [activity, activityIndex, attempts, complete, selected]);
+    };
+
+    void recordEvidence();
+  }, [activity, activityIndex, attempts, complete, isReview, selected, skillId]);
 
   const toggleObject = async (id: string) => {
     if (complete) return;
@@ -148,7 +173,7 @@ export default function ActivityScreen() {
       activityId: activity.id,
       activityVersion: 1,
       skillIds: [activity.skillId],
-      payload: { objectId: id, alreadySelected: selected.includes(id) },
+      payload: { objectId: id, alreadySelected: selected.includes(id), sessionKind: isReview ? 'REVIEW' : 'PRACTICE' },
     });
 
     setSelected((current) => {
@@ -160,6 +185,11 @@ export default function ActivityScreen() {
   };
 
   const continueAfterSuccess = () => {
+    if (isReview) {
+      router.replace('/garden?earned=seed&from=review');
+      return;
+    }
+
     const nextIndex = activityIndex + 1;
     if (nextIndex < 3) {
       router.replace(`/activity?activity=${nextIndex}`);
@@ -206,12 +236,12 @@ export default function ActivityScreen() {
         {complete ? (
           <View style={styles.celebration}>
             <Text accessibilityElementsHidden style={styles.stars}>⭐ ⭐ ⭐</Text>
-            <Text style={styles.encouragement}>{activityIndex < 2 ? 'One more adventure!' : 'Great counting!'}</Text>
-            <Pressable accessibilityLabel={activityIndex < 2 ? 'Continue to next counting adventure' : 'Collect your seed reward'} accessibilityRole="button" onPress={continueAfterSuccess} style={styles.action}>
-              <Text style={styles.actionText}>{activityIndex < 2 ? 'Next adventure →' : 'Collect my seed 🌱'}</Text>
+            <Text style={styles.encouragement}>{isReview ? 'You remembered it!' : activityIndex < 2 ? 'One more adventure!' : 'Great counting!'}</Text>
+            <Pressable accessibilityLabel={isReview ? 'Finish counting review' : activityIndex < 2 ? 'Continue to next counting adventure' : 'Collect your seed reward'} accessibilityRole="button" onPress={continueAfterSuccess} style={styles.action}>
+              <Text style={styles.actionText}>{isReview ? 'Back to my garden 🌱' : activityIndex < 2 ? 'Next adventure →' : 'Collect my seed 🌱'}</Text>
             </Pressable>
           </View>
-        ) : <Text style={styles.helper}>Tap each one as you count.</Text>}
+        ) : <Text style={styles.helper}>{isReview ? 'Show Budly what you remember.' : 'Tap each one as you count.'}</Text>}
       </View>
     </SafeAreaView>
   );
