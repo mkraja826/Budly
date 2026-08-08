@@ -2,8 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { buildCountingEvidence, createLearningEventId } from '../src/domain/learning/events';
+import type { SkillId } from '../src/domain/learning/mastery';
 import { DefaultChildCharacter } from '../src/features/character/DefaultChildCharacter';
 import { childSelectionFeedback, childSuccessFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
+import { applySkillEvidence } from '../src/features/learningEvidence/childSkillStateStore';
 import { appendLearningEvent } from '../src/features/learningEvidence/localEvidenceStore';
 import { getCountingActivity } from '../src/features/learningTree/countingActivities';
 
@@ -98,7 +100,40 @@ export default function ActivityScreen() {
       skillIds: [activity.skillId],
       payload: { ...evidence },
     });
-  }, [activity, attempts, complete, selected]);
+
+    void applySkillEvidence(LOCAL_CHILD_ID, {
+      skillId: activity.skillId as SkillId,
+      correct: evidence.distinctSelections === evidence.targetCount,
+      attempts: Math.max(1, evidence.attempts),
+      hintsUsed: evidence.hintsUsed,
+      responseTimeMs: evidence.responseTimeMs,
+      difficulty: Math.min(1, activity.targetCount / 5),
+      independentCompletion: evidence.completedIndependently,
+      transferActivity: activityIndex > 0,
+      occurredAt: completedAt,
+    }).then((update) => {
+      if (update.next.mastery !== update.previous.mastery) {
+        void appendLearningEvent({
+          eventId: createLearningEventId('mastery_changed'),
+          eventType: 'SKILL_EVIDENCE_RECORDED',
+          occurredAt: completedAt,
+          childId: LOCAL_CHILD_ID,
+          activityId: activity.id,
+          activityVersion: 1,
+          skillIds: [activity.skillId],
+          payload: {
+            kind: 'MASTERY_STATE_CHANGED',
+            previousMastery: update.previous.mastery,
+            nextMastery: update.next.mastery,
+            confidence: update.next.confidence,
+            evidenceCount: update.next.evidenceCount,
+            engineVersion: update.next.engineVersion,
+            reasons: update.reasons,
+          },
+        });
+      }
+    });
+  }, [activity, activityIndex, attempts, complete, selected]);
 
   const toggleObject = async (id: string) => {
     if (complete) return;
