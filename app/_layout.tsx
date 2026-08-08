@@ -8,6 +8,7 @@ export default function RootLayout() {
       <Stack.Screen name="activity" />
       <Stack.Screen name="garden" />
       <Stack.Screen name="parent-gate" />
+      <Stack.Screen name="parent-progress" />
     </Stack>
   );
 }
