@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { DefaultChildCharacter } from '../src/features/character/DefaultChildCharacter';
+import { childSelectionFeedback, childSuccessFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
 
 const APPLES = ['apple-1', 'apple-2', 'apple-3'] as const;
 
 export default function ActivityScreen() {
   const [selected, setSelected] = useState<string[]>([]);
+  const celebrated = useRef(false);
   const complete = selected.length === APPLES.length;
 
   const prompt = useMemo(() => {
@@ -15,11 +17,31 @@ export default function ActivityScreen() {
     return `${selected.length}... keep looking!`;
   }, [complete, selected.length]);
 
-  const toggleApple = (id: string) => {
+  useEffect(() => {
+    void speakChildPrompt('Can you find three apples? Tap each apple as you count.');
+    return () => {
+      void stopChildSpeech();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!complete || celebrated.current) return;
+    celebrated.current = true;
+    void childSuccessFeedback();
+    void speakChildPrompt('Yay! You found three apples! Great counting!');
+  }, [complete]);
+
+  const toggleApple = async (id: string) => {
     if (complete) return;
-    setSelected((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
+    await childSelectionFeedback();
+    setSelected((current) => {
+      if (current.includes(id)) return current;
+      const next = [...current, id];
+      if (next.length < APPLES.length) {
+        void speakChildPrompt(String(next.length));
+      }
+      return next;
+    });
   };
 
   return (
@@ -36,10 +58,15 @@ export default function ActivityScreen() {
           accessibilityLabel={complete ? 'Budly child celebrating' : 'Budly child pointing to the counting activity'}
         />
 
-        <View style={[styles.speechBubble, complete && styles.speechBubbleComplete]}>
+        <Pressable
+          accessibilityLabel="Hear the instruction again"
+          accessibilityRole="button"
+          onPress={() => speakChildPrompt(complete ? 'Yay! You found three apples! Great counting!' : 'Can you find three apples? Tap each apple as you count.')}
+          style={[styles.speechBubble, complete && styles.speechBubbleComplete]}
+        >
           <Text accessibilityLiveRegion="polite" style={styles.prompt}>{prompt}</Text>
-          <Text style={styles.voiceHint}>🔊 Tap the apples as you count</Text>
-        </View>
+          <Text style={styles.voiceHint}>🔊 Tap to hear again</Text>
+        </Pressable>
 
         <View accessibilityLabel="Three apples to count" style={styles.objects}>
           {APPLES.map((apple, index) => {
@@ -59,13 +86,13 @@ export default function ActivityScreen() {
           })}
         </View>
 
-        <View style={styles.progressDots}>
+        <View accessibilityLabel={`${selected.length} of 3 apples counted`} style={styles.progressDots}>
           {APPLES.map((apple) => <View key={apple} style={[styles.dot, selected.includes(apple) && styles.dotDone]} />)}
         </View>
 
         {complete ? (
           <View style={styles.celebration}>
-            <Text style={styles.stars}>⭐ ⭐ ⭐</Text>
+            <Text accessibilityElementsHidden style={styles.stars}>⭐ ⭐ ⭐</Text>
             <Text style={styles.encouragement}>Great counting!</Text>
             <Pressable accessibilityLabel="Collect your seed reward" accessibilityRole="button" onPress={() => router.replace('/garden?earned=seed')} style={styles.action}>
               <Text style={styles.actionText}>Collect my seed 🌱</Text>
@@ -88,7 +115,7 @@ const styles = StyleSheet.create({
   voiceHint: { fontSize: 15, fontWeight: '700', color: '#657985', textAlign: 'center' },
   objects: { flexDirection: 'row', gap: 14, flexWrap: 'wrap', justifyContent: 'center' },
   appleButton: { width: 94, height: 94, borderRadius: 47, backgroundColor: '#FFF', borderWidth: 4, borderColor: '#D7ECF6', alignItems: 'center', justifyContent: 'center' },
-  appleButtonSelected: { borderColor: '#62B84F', transform: [{ scale: 1.06 }] },
+  appleButtonSelected: { borderColor: '#62B84F', transform: [{ scale: 1.06 }], backgroundColor: '#F3FFE9' },
   apple: { fontSize: 62 },
   countBadge: { position: 'absolute', right: -3, top: -3, minWidth: 32, height: 32, borderRadius: 16, backgroundColor: '#FFD34E', color: '#473D18', textAlign: 'center', lineHeight: 32, fontSize: 18, fontWeight: '900' },
   progressDots: { flexDirection: 'row', gap: 10 },
