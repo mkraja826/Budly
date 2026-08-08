@@ -37,11 +37,24 @@ export async function getCompletedReviewCount(childId: string, skillId: SkillId)
   return row?.completed_reviews ?? 0;
 }
 
-export async function upsertReviewPlan(
-  childId: string,
-  skillId: SkillId,
-  plan: ReviewPlan,
-): Promise<void> {
+export async function getReviewPlan(childId: string, skillId: SkillId) {
+  const db = await getDb();
+  return db.getFirstAsync<{
+    due_at: string;
+    interval_days: number;
+    reason: ReviewPlan['reason'];
+    scheduler_version: string;
+    completed_reviews: number;
+  }>(
+    `SELECT due_at, interval_days, reason, scheduler_version, completed_reviews
+     FROM review_schedule
+     WHERE child_id = ? AND skill_id = ?`,
+    childId,
+    skillId,
+  );
+}
+
+export async function upsertReviewPlan(childId: string, skillId: SkillId, plan: ReviewPlan): Promise<void> {
   const db = await getDb();
   await db.runAsync(
     `INSERT INTO review_schedule (
