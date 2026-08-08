@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { DefaultChildCharacter } from '../src/features/character/DefaultChildCharacter';
 
 const zones = [
   { title: 'Learning Tree', icon: '🌳', action: () => router.push('/activity') },
@@ -23,9 +24,7 @@ export default function SeedHomeScreen() {
 
         <View style={styles.companionWrap}>
           <Text style={styles.speech}>Hi! Ready for an adventure?</Text>
-          <View style={styles.character}>
-            <Text style={styles.characterEmoji}>🧒</Text>
-          </View>
+          <DefaultChildCharacter size={160} pose="wave" expression="happy" accessibilityLabel="Budly default child waving hello" />
         </View>
 
         <View style={styles.zones}>
@@ -62,8 +61,6 @@ const styles = StyleSheet.create({
   parentButtonText: { fontWeight: '800', color: '#4A3B6D' },
   companionWrap: { alignItems: 'center', gap: 10 },
   speech: { backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22, fontSize: 18, fontWeight: '800', color: '#29404F' },
-  character: { width: 150, height: 150, borderRadius: 75, backgroundColor: '#BFE7A8', alignItems: 'center', justifyContent: 'center', borderWidth: 6, borderColor: '#FFFFFF' },
-  characterEmoji: { fontSize: 90 },
   zones: { flexDirection: 'row', gap: 12 },
   zone: { flex: 1, minHeight: 150, borderRadius: 30, backgroundColor: '#F7F1C7', alignItems: 'center', justifyContent: 'center', padding: 10, borderWidth: 4, borderColor: '#FFFFFF' },
   zonePressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
