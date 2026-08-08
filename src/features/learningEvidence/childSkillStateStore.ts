@@ -69,10 +69,10 @@ export async function getChildSkillState(childId: string, skillId: SkillId): Pro
   };
 }
 
-export async function applySkillEvidence(childId: string, evidence: SkillEvidence) {
+export async function upsertChildSkillStateSnapshot(childId: string, state: ChildSkillState): Promise<void> {
   const db = await getDb();
-  const current = await getChildSkillState(childId, evidence.skillId);
-  const update = evaluateEvidence(current, evidence);
+  const current = await getChildSkillState(childId, state.skillId);
+  if (current.evidenceCount > state.evidenceCount) return;
 
   await db.runAsync(
     `INSERT INTO child_skill_states (
@@ -87,14 +87,22 @@ export async function applySkillEvidence(childId: string, evidence: SkillEvidenc
       engine_version = excluded.engine_version,
       updated_at = excluded.updated_at`,
     childId,
-    update.next.skillId,
-    update.next.mastery,
-    update.next.confidence,
-    update.next.evidenceCount,
-    update.next.lastEvidenceAt ?? null,
-    update.next.engineVersion,
+    state.skillId,
+    state.mastery,
+    state.confidence,
+    state.evidenceCount,
+    state.lastEvidenceAt ?? null,
+    state.engineVersion,
     new Date().toISOString(),
   );
+}
+
+export async function applySkillEvidence(childId: string, evidence: SkillEvidence) {
+  const db = await getDb();
+  const current = await getChildSkillState(childId, evidence.skillId);
+  const update = evaluateEvidence(current, evidence);
+
+  await upsertChildSkillStateSnapshot(childId, update.next);
 
   const completedReviews = await getCompletedReviewCount(childId, evidence.skillId);
   const reviewPlan = scheduleReview(update.next, evidence.occurredAt, completedReviews);
