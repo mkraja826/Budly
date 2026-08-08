@@ -1,14 +1,29 @@
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { DefaultChildCharacter } from '../src/features/character/DefaultChildCharacter';
+import { childSelectionFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
 
 const zones = [
-  { title: 'Learning Tree', icon: '🌳', action: () => router.push('/activity') },
-  { title: 'Adventure Path', icon: '🐾', action: () => router.push('/activity') },
-  { title: 'Music Garden', icon: '🎵', action: () => router.push('/activity') },
+  { title: 'Learning Tree', icon: '🌳', route: '/activity' as const, voice: 'Let’s count together!' },
+  { title: 'Adventure Path', icon: '🐾', route: '/activity' as const, voice: 'Adventure time!' },
+  { title: 'Music Garden', icon: '🎵', route: '/activity' as const, voice: 'Let’s make some music!' },
 ];
 
 export default function SeedHomeScreen() {
+  useEffect(() => {
+    void speakChildPrompt('Hi! Ready for an adventure?');
+    return () => {
+      void stopChildSpeech();
+    };
+  }, []);
+
+  const openZone = async (route: '/activity', voice: string) => {
+    await childSelectionFeedback();
+    await speakChildPrompt(voice);
+    router.push(route);
+  };
+
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.sky}>
@@ -23,13 +38,20 @@ export default function SeedHomeScreen() {
         </View>
 
         <View style={styles.companionWrap}>
-          <Text style={styles.speech}>Hi! Ready for an adventure?</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Hear Budly greeting again"
+            onPress={() => speakChildPrompt('Hi! Ready for an adventure?')}
+            style={styles.speech}
+          >
+            <Text style={styles.speechText}>🔊 Hi! Ready for an adventure?</Text>
+          </Pressable>
           <DefaultChildCharacter size={160} pose="wave" expression="happy" accessibilityLabel="Budly default child waving hello" />
         </View>
 
         <View style={styles.zones}>
           {zones.map((zone) => (
-            <Pressable key={zone.title} onPress={zone.action} style={({ pressed }) => [styles.zone, pressed && styles.zonePressed]} accessibilityRole="button" accessibilityLabel={zone.title}>
+            <Pressable key={zone.title} onPress={() => openZone(zone.route, zone.voice)} style={({ pressed }) => [styles.zone, pressed && styles.zonePressed]} accessibilityRole="button" accessibilityLabel={zone.title}>
               <Text style={styles.zoneIcon}>{zone.icon}</Text>
               <Text style={styles.zoneTitle}>{zone.title}</Text>
             </Pressable>
@@ -60,7 +82,8 @@ const styles = StyleSheet.create({
   parentButton: { backgroundColor: '#FFFFFFCC', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
   parentButtonText: { fontWeight: '800', color: '#4A3B6D' },
   companionWrap: { alignItems: 'center', gap: 10 },
-  speech: { backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22, fontSize: 18, fontWeight: '800', color: '#29404F' },
+  speech: { backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22 },
+  speechText: { fontSize: 18, fontWeight: '800', color: '#29404F' },
   zones: { flexDirection: 'row', gap: 12 },
   zone: { flex: 1, minHeight: 150, borderRadius: 30, backgroundColor: '#F7F1C7', alignItems: 'center', justifyContent: 'center', padding: 10, borderWidth: 4, borderColor: '#FFFFFF' },
   zonePressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
