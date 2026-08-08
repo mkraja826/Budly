@@ -1,7 +1,8 @@
 import type { ChildSkillState, SkillId } from '../../domain/learning/mastery';
+import type { ReviewPlan } from '../../domain/learning/reviewScheduler';
 import { supabase } from '../../infrastructure/supabase/client';
-import { getChildSkillState } from '../learningEvidence/childSkillStateStore';
-import { getReviewPlan } from '../learningEvidence/reviewScheduleStore';
+import { getChildSkillState, upsertChildSkillStateSnapshot } from '../learningEvidence/childSkillStateStore';
+import { getReviewPlan, upsertReviewSnapshot } from '../learningEvidence/reviewScheduleStore';
 
 export async function syncDerivedLearningState(childId: string, skillId: SkillId): Promise<boolean> {
   const { data: sessionData } = await supabase.auth.getSession();
@@ -33,7 +34,7 @@ export type RemoteLearningSnapshot = Readonly<{
   review: {
     dueAt: string;
     intervalDays: number;
-    reason: string;
+    reason: ReviewPlan['reason'];
     schedulerVersion: string;
     completedReviews: number;
   } | null;
@@ -72,10 +73,28 @@ export async function fetchRemoteLearningSnapshot(childId: string, skillId: Skil
       ? {
           dueAt: reviewRow.due_at,
           intervalDays: reviewRow.interval_days,
-          reason: reviewRow.reason,
+          reason: reviewRow.reason as ReviewPlan['reason'],
           schedulerVersion: reviewRow.scheduler_version,
           completedReviews: reviewRow.completed_reviews,
         }
       : null,
   };
+}
+
+export async function reconcileDerivedLearningState(childId: string, skillId: SkillId): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session) return;
+
+  const remote = await fetchRemoteLearningSnapshot(childId, skillId);
+  const local = await getChildSkillState(childId, skillId);
+
+  if (remote.state && remote.state.evidenceCount >= local.evidenceCount) {
+    await upsertChildSkillStateSnapshot(childId, remote.state);
+  } else if (local.evidenceCount > 0) {
+    await syncDerivedLearningState(childId, skillId);
+  }
+
+  if (remote.review) {
+    await upsertReviewSnapshot(childId, skillId, remote.review);
+  }
 }
