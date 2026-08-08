@@ -10,6 +10,8 @@ import { applySkillEvidence } from '../src/features/learningEvidence/childSkillS
 import { appendLearningEvent } from '../src/features/learningEvidence/localEvidenceStore';
 import { markReviewCompleted } from '../src/features/learningEvidence/reviewScheduleStore';
 import { getCountingActivity } from '../src/features/learningTree/countingActivities';
+import { syncDerivedLearningState } from '../src/features/sync/derivedLearningStateSync';
+import { syncPendingLearningEvents } from '../src/features/sync/learningEventSync';
 
 export default function ActivityScreen() {
   const { childId, loading: identityLoading } = useActiveChildId();
@@ -86,6 +88,13 @@ export default function ActivityScreen() {
           payload: { kind: 'MASTERY_STATE_CHANGED', previousMastery: update.previous.mastery, nextMastery: update.next.mastery, confidence: update.next.confidence, evidenceCount: update.next.evidenceCount, engineVersion: update.next.engineVersion, reasons: update.reasons },
         });
       }
+
+      void Promise.all([
+        syncPendingLearningEvents(),
+        syncDerivedLearningState(childId, skillId),
+      ]).catch(() => {
+        // Offline/auth failures are expected. Local evidence and state remain authoritative until the next sync.
+      });
     };
     void recordEvidence();
   }, [activity, activityIndex, attempts, childId, complete, isReview, selected, skillId]);
