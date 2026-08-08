@@ -24,6 +24,8 @@ export interface CharacterManifest {
   sourceFileName: string;
   sourceFormat: 'glb';
   sourceBytes: number;
+  mobileCandidateFileName?: string;
+  mobileCandidateBytes?: number;
   assetStatus: CharacterAssetStatus;
   hasRig: boolean;
   animationCount: number;
@@ -36,13 +38,16 @@ export const DEFAULT_CHILD_CHARACTER: CharacterManifest = {
   sourceFileName: 'wings_of_freedom-child-3741.glb',
   sourceFormat: 'glb',
   sourceBytes: 28_631_364,
-  assetStatus: 'reference-only',
+  mobileCandidateFileName: 'budly-default-child-mobile-v1.glb',
+  mobileCandidateBytes: 16_136_548,
+  assetStatus: 'optimized-static',
   hasRig: false,
   animationCount: 0,
   notes: [
     'Approved as the visual reference for the initial Budly child avatar.',
-    'Source GLB is intentionally not bundled until it is optimized for mobile.',
-    'Current source has no skin/rig and no embedded animations.',
-    'Screens consume the character through a reusable renderer boundary so the optimized GLB can replace the fallback without changing learning logic.',
+    'The verified mobile candidate reduces embedded textures from 2048px to 1024px while preserving the original mesh and materials.',
+    'The current source and mobile candidate have no skin/rig and no embedded animations.',
+    'The mobile candidate is not yet the final production asset; geometry optimization and humanoid rigging are still required.',
+    'Screens consume the character through a reusable renderer boundary so the final rigged GLB can replace the current fallback without changing learning logic.',
   ],
 };
