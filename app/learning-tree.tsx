@@ -6,6 +6,7 @@ import type { ChildSkillState, SkillId } from '../src/domain/learning/mastery';
 import { DefaultChildCharacter } from '../src/features/character/DefaultChildCharacter';
 import { childSelectionFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
 import { getChildSkillState } from '../src/features/learningEvidence/childSkillStateStore';
+import { getDueReviews } from '../src/features/learningEvidence/reviewScheduleStore';
 
 const LOCAL_CHILD_ID = 'local-child-v1';
 const COUNTING_SKILL_ID = 'MATH.NUMBERS.COUNTING.01' as SkillId;
@@ -20,11 +21,17 @@ const FALLBACK_STATE: ChildSkillState = {
 
 export default function LearningTreeScreen() {
   const [skillState, setSkillState] = useState<ChildSkillState>(FALLBACK_STATE);
+  const [reviewDue, setReviewDue] = useState(false);
 
   useEffect(() => {
     let active = true;
-    void getChildSkillState(LOCAL_CHILD_ID, COUNTING_SKILL_ID).then((state) => {
-      if (active) setSkillState(state);
+    void Promise.all([
+      getChildSkillState(LOCAL_CHILD_ID, COUNTING_SKILL_ID),
+      getDueReviews(LOCAL_CHILD_ID),
+    ]).then(([state, dueReviews]) => {
+      if (!active) return;
+      setSkillState(state);
+      setReviewDue(dueReviews.some((review) => review.skill_id === COUNTING_SKILL_ID));
     });
 
     return () => {
@@ -32,7 +39,16 @@ export default function LearningTreeScreen() {
     };
   }, []);
 
-  const recommendation = useMemo(() => recommendCountingPractice(skillState), [skillState]);
+  const recommendation = useMemo(() => {
+    if (reviewDue) {
+      return {
+        kind: 'REVIEW' as const,
+        startActivityIndex: 1,
+        reason: 'A scheduled counting retention check is due.',
+      };
+    }
+    return recommendCountingPractice(skillState);
+  }, [reviewDue, skillState]);
 
   const guideCopy = useMemo(() => {
     switch (recommendation.kind) {
@@ -57,7 +73,8 @@ export default function LearningTreeScreen() {
   const startCounting = async () => {
     await childSelectionFeedback();
     await speakChildPrompt(guideCopy);
-    router.push(`/activity?activity=${recommendation.startActivityIndex}`);
+    const reviewParam = recommendation.kind === 'REVIEW' ? '&review=1' : '';
+    router.push(`/activity?activity=${recommendation.startActivityIndex}${reviewParam}`);
   };
 
   return (
@@ -89,9 +106,9 @@ export default function LearningTreeScreen() {
           <Text style={styles.speechText}>🔊 {guideCopy}</Text>
         </Pressable>
 
-        <Pressable accessibilityLabel="Start adaptive counting adventure" accessibilityRole="button" onPress={startCounting} style={({ pressed }) => [styles.start, pressed && styles.startPressed]}>
-          <Text style={styles.startIcon}>🍎</Text>
-          <Text style={styles.startText}>Let’s Count!</Text>
+        <Pressable accessibilityLabel={recommendation.kind === 'REVIEW' ? 'Start counting review' : 'Start adaptive counting adventure'} accessibilityRole="button" onPress={startCounting} style={({ pressed }) => [styles.start, pressed && styles.startPressed]}>
+          <Text style={styles.startIcon}>{recommendation.kind === 'REVIEW' ? '🔁' : '🍎'}</Text>
+          <Text style={styles.startText}>{recommendation.kind === 'REVIEW' ? 'Remember?' : 'Let’s Count!'}</Text>
         </Pressable>
 
         <View style={styles.ground} />
