@@ -5,9 +5,9 @@ import { DefaultChildCharacter } from '../src/features/character/DefaultChildCha
 import { childSelectionFeedback, speakChildPrompt, stopChildSpeech } from '../src/features/feedback/childFeedback';
 
 const zones = [
-  { title: 'Learning Tree', icon: '🌳', route: '/activity' as const, voice: 'Let’s count together!' },
-  { title: 'Adventure Path', icon: '🐾', route: '/activity' as const, voice: 'Adventure time!' },
-  { title: 'Music Garden', icon: '🎵', route: '/activity' as const, voice: 'Let’s make some music!' },
+  { title: 'Learning Tree', icon: '🌳', route: '/activity' as const, voice: 'Let’s count together!', style: 'tree' as const },
+  { title: 'Adventure Path', icon: '🐾', route: '/activity' as const, voice: 'Adventure time!', style: 'path' as const },
+  { title: 'Music Garden', icon: '🎵', route: '/activity' as const, voice: 'Let’s make some music!', style: 'music' as const },
 ];
 
 export default function SeedHomeScreen() {
@@ -26,18 +26,26 @@ export default function SeedHomeScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <View style={styles.sky}>
+      <View style={styles.world}>
+        <View style={styles.sun}><Text style={styles.sunText}>☀️</Text></View>
+        <Text style={[styles.cloud, styles.cloudLeft]}>☁️</Text>
+        <Text style={[styles.cloud, styles.cloudRight]}>☁️</Text>
+
         <View style={styles.topRow}>
           <View>
             <Text style={styles.brand}>Budly 🌱</Text>
             <Text style={styles.tagline}>Learn. Play. Grow.</Text>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Open parent space" onPress={() => router.push('/parent-gate')} style={styles.parentButton}>
-            <Text style={styles.parentButtonText}>🔒 Parents</Text>
+            <Text style={styles.parentButtonText}>🔒</Text>
           </Pressable>
         </View>
 
-        <View style={styles.companionWrap}>
+        <View style={styles.scene}>
+          <View style={styles.hillsBack} />
+          <View style={styles.hillsFront} />
+          <View style={styles.ground} />
+
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Hear Budly greeting again"
@@ -46,27 +54,40 @@ export default function SeedHomeScreen() {
           >
             <Text style={styles.speechText}>🔊 Hi! Ready for an adventure?</Text>
           </Pressable>
-          <DefaultChildCharacter size={160} pose="wave" expression="happy" accessibilityLabel="Budly default child waving hello" />
-        </View>
 
-        <View style={styles.zones}>
-          {zones.map((zone) => (
-            <Pressable key={zone.title} onPress={() => openZone(zone.route, zone.voice)} style={({ pressed }) => [styles.zone, pressed && styles.zonePressed]} accessibilityRole="button" accessibilityLabel={zone.title}>
-              <Text style={styles.zoneIcon}>{zone.icon}</Text>
-              <Text style={styles.zoneTitle}>{zone.title}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.bottomRow}>
-          <View style={styles.goalCard}>
-            <Text style={styles.goalLabel}>Today’s adventure</Text>
-            <Text style={styles.goalValue}>⭐ 3 little activities</Text>
+          <View style={styles.characterSpot}>
+            <DefaultChildCharacter size={164} pose="wave" expression="happy" accessibilityLabel="Budly default child waving hello" />
           </View>
-          <Pressable onPress={() => router.push('/garden')} style={styles.gardenCard} accessibilityRole="button" accessibilityLabel="Open my garden">
-            <Text style={styles.goalLabel}>My Garden</Text>
-            <Text style={styles.goalValue}>🌱 12</Text>
+
+          {zones.map((zone) => {
+            const zoneStyle = zone.style === 'tree' ? styles.treeZone : zone.style === 'path' ? styles.pathZone : styles.musicZone;
+            const badgeStyle = zone.style === 'tree' ? styles.treeBadge : zone.style === 'path' ? styles.pathBadge : styles.musicBadge;
+            return (
+              <Pressable
+                key={zone.title}
+                onPress={() => openZone(zone.route, zone.voice)}
+                style={({ pressed }) => [styles.worldZone, zoneStyle, pressed && styles.zonePressed]}
+                accessibilityRole="button"
+                accessibilityLabel={zone.title}
+              >
+                <Text style={styles.zoneIcon}>{zone.icon}</Text>
+                <View style={[styles.zoneBadge, badgeStyle]}>
+                  <Text style={styles.zoneTitle}>{zone.title}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+
+          <Pressable onPress={() => router.push('/garden')} style={styles.gardenPatch} accessibilityRole="button" accessibilityLabel="Open my garden">
+            <Text style={styles.gardenEmoji}>🌱 🌷 🦋</Text>
+            <Text style={styles.gardenTitle}>My Garden</Text>
+            <Text style={styles.gardenCount}>12 seeds</Text>
           </Pressable>
+
+          <View style={styles.todayBubble}>
+            <Text style={styles.todayLabel}>Today</Text>
+            <Text style={styles.todayValue}>⭐ 3 adventures</Text>
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -74,24 +95,41 @@ export default function SeedHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#EAF7FF' },
-  sky: { flex: 1, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 24, justifyContent: 'space-between' },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  screen: { flex: 1, backgroundColor: '#CFEFFF' },
+  world: { flex: 1, backgroundColor: '#CFEFFF', overflow: 'hidden' },
+  sun: { position: 'absolute', top: 36, right: 28, width: 84, height: 84, borderRadius: 42, backgroundColor: '#FFF2A8', alignItems: 'center', justifyContent: 'center' },
+  sunText: { fontSize: 48 },
+  cloud: { position: 'absolute', fontSize: 64, opacity: 0.9 },
+  cloudLeft: { top: 88, left: 18 },
+  cloudRight: { top: 124, right: 96 },
+  topRow: { zIndex: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 8 },
   brand: { fontSize: 34, fontWeight: '900', color: '#4A55C7' },
   tagline: { fontSize: 16, fontWeight: '700', color: '#426174', marginTop: 2 },
-  parentButton: { backgroundColor: '#FFFFFFCC', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
-  parentButtonText: { fontWeight: '800', color: '#4A3B6D' },
-  companionWrap: { alignItems: 'center', gap: 10 },
-  speech: { backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22 },
-  speechText: { fontSize: 18, fontWeight: '800', color: '#29404F' },
-  zones: { flexDirection: 'row', gap: 12 },
-  zone: { flex: 1, minHeight: 150, borderRadius: 30, backgroundColor: '#F7F1C7', alignItems: 'center', justifyContent: 'center', padding: 10, borderWidth: 4, borderColor: '#FFFFFF' },
-  zonePressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
-  zoneIcon: { fontSize: 55, marginBottom: 8 },
-  zoneTitle: { fontSize: 17, fontWeight: '900', textAlign: 'center', color: '#38503C' },
-  bottomRow: { flexDirection: 'row', gap: 12 },
-  goalCard: { flex: 1.4, backgroundColor: '#FFF7DD', borderRadius: 22, padding: 16 },
-  gardenCard: { flex: 1, backgroundColor: '#E6F5DE', borderRadius: 22, padding: 16 },
-  goalLabel: { fontSize: 13, fontWeight: '800', color: '#68747B' },
-  goalValue: { fontSize: 17, fontWeight: '900', color: '#2E454F', marginTop: 5 },
+  parentButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFFFFFCC', alignItems: 'center', justifyContent: 'center' },
+  parentButtonText: { fontSize: 22 },
+  scene: { flex: 1, marginTop: 6, position: 'relative' },
+  hillsBack: { position: 'absolute', left: -80, right: -80, bottom: 170, height: 230, borderTopLeftRadius: 280, borderTopRightRadius: 280, backgroundColor: '#A9D88E' },
+  hillsFront: { position: 'absolute', left: -130, right: -30, bottom: 90, height: 220, borderTopLeftRadius: 320, borderTopRightRadius: 320, backgroundColor: '#7FCB72' },
+  ground: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 180, backgroundColor: '#69B95D' },
+  speech: { position: 'absolute', top: 10, alignSelf: 'center', zIndex: 7, backgroundColor: '#FFFFFFF2', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 24, maxWidth: 310 },
+  speechText: { fontSize: 17, fontWeight: '900', color: '#29404F', textAlign: 'center' },
+  characterSpot: { position: 'absolute', alignSelf: 'center', bottom: 118, zIndex: 6 },
+  worldZone: { position: 'absolute', alignItems: 'center', justifyContent: 'center', minWidth: 120, minHeight: 130 },
+  treeZone: { left: 16, top: 92 },
+  pathZone: { right: 12, top: 120 },
+  musicZone: { left: 32, bottom: 54 },
+  zonePressed: { transform: [{ scale: 0.95 }], opacity: 0.92 },
+  zoneIcon: { fontSize: 84 },
+  zoneBadge: { marginTop: -4, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 3, borderColor: '#FFF' },
+  treeBadge: { backgroundColor: '#F5E49B' },
+  pathBadge: { backgroundColor: '#F2D9C6' },
+  musicBadge: { backgroundColor: '#DCCDF7' },
+  zoneTitle: { fontSize: 15, fontWeight: '900', color: '#38503C', textAlign: 'center' },
+  gardenPatch: { position: 'absolute', right: 20, bottom: 36, width: 150, minHeight: 106, borderRadius: 30, backgroundColor: '#DDF4CD', borderWidth: 4, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center', padding: 10 },
+  gardenEmoji: { fontSize: 28 },
+  gardenTitle: { fontSize: 16, fontWeight: '900', color: '#3A703A', marginTop: 4 },
+  gardenCount: { fontSize: 13, fontWeight: '800', color: '#59725A', marginTop: 2 },
+  todayBubble: { position: 'absolute', left: 18, bottom: 166, backgroundColor: '#FFF7D4E8', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 3, borderColor: '#FFF' },
+  todayLabel: { fontSize: 12, fontWeight: '800', color: '#68747B' },
+  todayValue: { fontSize: 15, fontWeight: '900', color: '#2E454F', marginTop: 2 },
 });
