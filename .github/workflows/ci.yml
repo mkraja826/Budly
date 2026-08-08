@@ -1,0 +1,42 @@
+name: Budly CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Validate Expo configuration
+        run: npx expo config --type public >/dev/null
+
+      - name: Reject service-role secrets in mobile source
+        shell: bash
+        run: |
+          if grep -RInE "service_role|SUPABASE_SERVICE_ROLE|sb_secret_" app src app.json package.json .env.example 2>/dev/null; then
+            echo "Privileged Supabase credential reference found in mobile source."
+            exit 1
+          fi
