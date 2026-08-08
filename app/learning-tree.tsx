@@ -8,6 +8,7 @@ import { childSelectionFeedback, speakChildPrompt, stopChildSpeech } from '../sr
 import { useActiveChildId } from '../src/features/family/useActiveChildId';
 import { getChildSkillState } from '../src/features/learningEvidence/childSkillStateStore';
 import { getDueReviews } from '../src/features/learningEvidence/reviewScheduleStore';
+import { reconcileDerivedLearningState } from '../src/features/sync/derivedLearningStateSync';
 
 const COUNTING_SKILL_ID = 'MATH.NUMBERS.COUNTING.01' as SkillId;
 
@@ -27,27 +28,25 @@ export default function LearningTreeScreen() {
   useEffect(() => {
     if (!childId) return;
     let active = true;
-    void Promise.all([
-      getChildSkillState(childId, COUNTING_SKILL_ID),
-      getDueReviews(childId),
-    ]).then(([state, dueReviews]) => {
+
+    const loadAdaptiveState = async () => {
+      await reconcileDerivedLearningState(childId, COUNTING_SKILL_ID);
+      const [state, dueReviews] = await Promise.all([
+        getChildSkillState(childId, COUNTING_SKILL_ID),
+        getDueReviews(childId),
+      ]);
       if (!active) return;
       setSkillState(state);
       setReviewDue(dueReviews.some((review) => review.skill_id === COUNTING_SKILL_ID));
-    });
-
-    return () => {
-      active = false;
     };
+
+    void loadAdaptiveState();
+    return () => { active = false; };
   }, [childId]);
 
   const recommendation = useMemo(() => {
     if (reviewDue) {
-      return {
-        kind: 'REVIEW' as const,
-        startActivityIndex: 1,
-        reason: 'A scheduled counting retention check is due.',
-      };
+      return { kind: 'REVIEW' as const, startActivityIndex: 1, reason: 'A scheduled counting retention check is due.' };
     }
     return recommendCountingPractice(skillState);
   }, [reviewDue, skillState]);
@@ -64,9 +63,7 @@ export default function LearningTreeScreen() {
   useEffect(() => {
     if (!childId) return;
     void speakChildPrompt(`Welcome to the Learning Tree. ${guideCopy}`);
-    return () => {
-      void stopChildSpeech();
-    };
+    return () => { void stopChildSpeech(); };
   }, [childId, guideCopy]);
 
   const startCounting = async () => {
