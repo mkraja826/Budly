@@ -1,6 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 import type { ChildSkillState, SkillEvidence, SkillId } from '../../domain/learning/mastery';
 import { evaluateEvidence } from '../../domain/learning/mastery';
+import { scheduleReview } from '../../domain/learning/reviewScheduler';
+import { getCompletedReviewCount, upsertReviewPlan } from './reviewScheduleStore';
 
 const DATABASE_NAME = 'budly-learning.db';
 const ENGINE_VERSION = 'mastery-v1';
@@ -94,5 +96,11 @@ export async function applySkillEvidence(childId: string, evidence: SkillEvidenc
     new Date().toISOString(),
   );
 
-  return update;
+  const completedReviews = await getCompletedReviewCount(childId, evidence.skillId);
+  const reviewPlan = scheduleReview(update.next, evidence.occurredAt, completedReviews);
+  if (reviewPlan) {
+    await upsertReviewPlan(childId, evidence.skillId, reviewPlan);
+  }
+
+  return { ...update, reviewPlan };
 }
