@@ -1,5 +1,5 @@
+import { supabase } from '../../infrastructure/supabase/client';
 import { getPendingLearningEvents, markLearningEventsSynced } from '../learningEvidence/localEvidenceStore';
-import { supabase } from '../../lib/supabase';
 
 export type LearningEventSyncResult = {
   attempted: number;
