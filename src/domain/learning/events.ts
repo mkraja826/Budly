@@ -26,30 +26,31 @@ export type CountingSelectionEvidence = {
   distinctSelections: number;
   attempts: number;
   hintsUsed: number;
+  responseTimeMs: number;
   completedIndependently: boolean;
 };
 
-export const COUNT_THREE_APPLES_ACTIVITY = {
-  activityId: 'ACT.COUNTING.OBJECTS.00001',
-  version: 1,
-  skillIds: ['MATH.NUMBERS.COUNTING.01'] as const,
-  targetCount: 3,
-} as const;
+export function createLearningEventId(prefix = 'evt'): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export function buildCountingEvidence(input: {
+  targetCount: number;
   selectedObjectIds: readonly string[];
   attempts: number;
   hintsUsed: number;
+  responseTimeMs: number;
 }): CountingSelectionEvidence {
   const distinctSelections = new Set(input.selectedObjectIds).size;
 
   return {
-    targetCount: COUNT_THREE_APPLES_ACTIVITY.targetCount,
+    targetCount: input.targetCount,
     selectedCount: input.selectedObjectIds.length,
     distinctSelections,
     attempts: Math.max(0, input.attempts),
     hintsUsed: Math.max(0, input.hintsUsed),
+    responseTimeMs: Math.max(0, input.responseTimeMs),
     completedIndependently:
-      distinctSelections === COUNT_THREE_APPLES_ACTIVITY.targetCount && input.hintsUsed === 0,
+      distinctSelections === input.targetCount && input.hintsUsed === 0,
   };
 }
